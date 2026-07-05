@@ -1,16 +1,8 @@
-# PawPal+ (Module 2 Project)
+# 🐾 PawPal+
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+**PawPal+** is a pet care planning assistant. It helps a pet owner stay consistent with day-to-day care — walks, feeding, medication, appointments — by tracking tasks per pet and building a prioritized, conflict-checked daily plan.
 
-## Scenario
-
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
-
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
-
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
+A backend logic layer (`pawpal_system.py`) models owners, pets, and recurring/one-off tasks, and a `Scheduler` turns them into an ordered plan for any given day — flagging scheduling conflicts, surfacing missed tasks, and finding open time slots. That logic is exposed two ways: a Streamlit app (`app.py`) for interactive use, and a CLI demo script (`main.py`) for a quick terminal walkthrough.
 
 ## ✨ Features
 
@@ -23,16 +15,6 @@ Your job is to design the system first (UML), then implement the logic in Python
 - **Missed-task recovery** — `Scheduler.get_missed_tasks()` surfaces overdue, uncompleted occurrences so they can be rescheduled via `Task.reschedule()` instead of silently vanishing.
 - **Next available slot** — `Scheduler.find_next_available_slot()` finds the earliest free window of a given length on a given date within an optional `earliest`/`latest` bound, correctly collapsing overlapping busy windows instead of stopping at the first one's end.
 
-## What you will build
-
-Your final app should:
-
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
-
 ## Getting started
 
 ### Setup
@@ -43,34 +25,25 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Suggested workflow
+### Running the app
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
+```bash
+streamlit run app.py
+```
+
+### Running the CLI demo
+
+`main.py` is a terminal-only walkthrough of the backend logic (no UI) — useful for a quick sanity check or for seeing the `Scheduler`'s output directly:
+
+```bash
+python main.py
+```
 
 ## 📐 System Design (UML)
 
 Class diagram reflecting the final implementation in `pawpal_system.py` (source: [`diagrams/uml_final.mmd`](diagrams/uml_final.mmd); earlier draft: [`diagrams/uml.mmd`](diagrams/uml.mmd)):
 
 ![PawPal+ UML diagram](diagrams/Pawpal_UML_02.png)
-
-## 🖥️ Sample Output
-
-Terminal output from running `python main.py` (see `main.py` for the owner/pet/task setup):
-
-```
-Today's Schedule -- 2026-07-05
-========================================
-07:30 AM  Mochi    Breakfast          [HIGH]
-08:00 AM  Mochi    Morning walk       [HIGH]
-09:00 AM  Biscuit  Flea medication    [MEDIUM]
-02:00 PM  Biscuit  Vet checkup        [MEDIUM]
-```
 
 ## 🧪 Testing PawPal+
 
@@ -90,6 +63,8 @@ The suite in `tests/test_pawpal.py` covers:
 - **Conflict detection**: `Scheduler.detect_conflicts()` flags two tasks scheduled at the exact same time, and correctly ignores back-to-back tasks that touch but don't overlap.
 - **Pet/task management**: adding a task increases a pet's task count.
 - **Priority scheduling**: `build_daily_plan` orders HIGH before MEDIUM regardless of time, and breaks same-priority ties chronologically (not alphabetically).
+- **Next available slot**: correctly skips a busy window, collapses two *overlapping* busy windows into one gap instead of reporting a false opening between them, and returns `None` when a pet's day is fully booked.
+- **Missed-weekly recovery**: recovers an isolated missed occurrence without disturbing the rest of the series, falls back to shifting the whole series when there's no room, respects `recurrence_end_date`, and rejects a non-`WEEKLY` task.
 
 Sample test output:
 
@@ -98,26 +73,33 @@ Sample test output:
 platform darwin -- Python 3.12.0, pytest-9.0.3, pluggy-1.6.0
 rootdir: /Users/bagheera/repos/codepath/Codepath_AI_110/Week05/ai110-module2show-pawpal-starter
 plugins: anyio-4.13.0
-collecting ... collected 11 items
+collecting ... collected 18 items
 
-tests/test_pawpal.py::test_mark_complete_changes_task_status PASSED      [  9%]
-tests/test_pawpal.py::test_add_task_increases_pet_task_count PASSED      [ 18%]
-tests/test_pawpal.py::test_next_occurrence_date_daily_is_timedelta_of_one_day PASSED [ 27%]
-tests/test_pawpal.py::test_next_occurrence_date_weekly_matches_anchor_weekday PASSED [ 36%]
-tests/test_pawpal.py::test_next_occurrence_date_none_when_recurrence_none_or_end_date_exceeded PASSED [ 45%]
-tests/test_pawpal.py::test_mark_complete_returns_next_occurrence_date PASSED [ 54%]
-tests/test_pawpal.py::test_sort_by_time_returns_chronological_order PASSED [ 63%]
-tests/test_pawpal.py::test_daily_recurrence_marks_today_complete_without_completing_tomorrow PASSED [ 72%]
-tests/test_pawpal.py::test_detect_conflicts_flags_overlapping_duplicate_times PASSED [ 81%]
-tests/test_pawpal.py::test_detect_conflicts_ignores_back_to_back_tasks PASSED [ 90%]
-tests/test_pawpal.py::test_build_daily_plan_orders_by_priority_then_start_time PASSED [100%]
+tests/test_pawpal.py::test_mark_complete_changes_task_status PASSED      [  5%]
+tests/test_pawpal.py::test_add_task_increases_pet_task_count PASSED      [ 11%]
+tests/test_pawpal.py::test_next_occurrence_date_daily_is_timedelta_of_one_day PASSED [ 16%]
+tests/test_pawpal.py::test_next_occurrence_date_weekly_matches_anchor_weekday PASSED [ 22%]
+tests/test_pawpal.py::test_next_occurrence_date_none_when_recurrence_none_or_end_date_exceeded PASSED [ 27%]
+tests/test_pawpal.py::test_mark_complete_returns_next_occurrence_date PASSED [ 33%]
+tests/test_pawpal.py::test_sort_by_time_returns_chronological_order PASSED [ 38%]
+tests/test_pawpal.py::test_daily_recurrence_marks_today_complete_without_completing_tomorrow PASSED [ 44%]
+tests/test_pawpal.py::test_detect_conflicts_flags_overlapping_duplicate_times PASSED [ 50%]
+tests/test_pawpal.py::test_detect_conflicts_ignores_back_to_back_tasks PASSED [ 55%]
+tests/test_pawpal.py::test_build_daily_plan_orders_by_priority_then_start_time PASSED [ 61%]
+tests/test_pawpal.py::test_find_next_available_slot_skips_busy_windows PASSED [ 66%]
+tests/test_pawpal.py::test_find_next_available_slot_collapses_overlapping_busy_windows PASSED [ 72%]
+tests/test_pawpal.py::test_find_next_available_slot_returns_none_when_fully_booked PASSED [ 77%]
+tests/test_pawpal.py::test_auto_reschedule_missed_weekly_recovers_single_occurrence_without_shifting_series PASSED [ 83%]
+tests/test_pawpal.py::test_auto_reschedule_missed_weekly_shifts_series_when_no_room_before_next_occurrence PASSED [ 88%]
+tests/test_pawpal.py::test_auto_reschedule_missed_weekly_returns_none_when_recurrence_ended PASSED [ 94%]
+tests/test_pawpal.py::test_auto_reschedule_missed_weekly_rejects_non_weekly_task PASSED [100%]
 
-============================== 11 passed in 0.01s ==============================
+============================== 18 passed in 0.01s ==============================
 ```
 
-**Confidence Level: ⭐⭐⭐⭐☆ (4/5)**
+### Known gaps
 
-All 14 tests pass, covering the core scheduling behaviors (recurrence, sorting, conflict detection, completion tracking, priority-then-time ordering, next-available-slot finding) and the edge cases that are easiest to get wrong (touching-vs-overlapping windows, per-date completion, non-anchor weekday lookups, overlapping busy windows collapsing correctly). One star held back because the suite doesn't yet exercise `build_daily_plan`'s `time_budget_minutes` cutoff, multi-pet conflict detection via `build_daily_plan_for_owner`, or `get_missed_tasks` — these are called out as follow-up cases in the test plan but not yet automated.
+All 18 tests pass, covering the core scheduling behaviors (recurrence, sorting, conflict detection, completion tracking, priority-then-time ordering, next-available-slot finding, missed-weekly recovery) and the edge cases that are easiest to get wrong (touching-vs-overlapping windows, per-date completion, non-anchor weekday lookups, overlapping busy windows collapsing correctly). Not yet covered by an automated test: `build_daily_plan`'s `time_budget_minutes` cutoff, multi-pet conflict detection via `build_daily_plan_for_owner`, and `get_missed_tasks` itself (its underlying logic is exercised indirectly through the `auto_reschedule_missed_weekly` tests, but it has no dedicated test of its own).
 
 ## 📐 Smarter Scheduling
 
@@ -144,30 +126,22 @@ Today's Schedule (priority first, then time within a tier)
 
 HIGH-priority "Breakfast" is first despite being scheduled last in the day. Within the MEDIUM tier, "Zebra checkup" (9:00 AM) correctly outranks "Ant grooming" (2:00 PM) even though "Ant" would sort first alphabetically — confirming the tie-break is time-based. See `test_build_daily_plan_orders_by_priority_then_start_time` in `tests/test_pawpal.py` for the automated version of this check.
 
-## 📸 Demo Walkthrough
+## 📸 Using the App
 
-### UI features
+The sidebar holds your name and a running Pets/Tasks count; the main area is organized into four tabs.
 
-- **Add a pet** — name, species, and birthdate; pets persist for the session and appear in a table.
-- **Add a task** — pick a pet, then set title, task type, duration, priority, time of day, and recurrence (None/Daily/Weekly); tasks appear in a table.
-- **Generate schedule** — builds today's plan across every pet the owner has, with a toggle to view it sorted by **priority** (default plan order) or by **time of day**.
+- **🐕 Pets** — add a pet (name, species, birthdate); pets appear in a table with a task count per pet.
+- **📝 Tasks** — pick a pet, then add a task (title, type, duration, priority, time, recurrence). A "🔍 Find the next open slot" helper (`Scheduler.find_next_available_slot()`) suggests a free time before you fill out the form. Every task in the list has a 🗑️ button to delete it (`Pet.remove_task()`).
+- **📅 Schedule** — builds today's plan across every pet (`Scheduler.build_daily_plan_for_owner()`), sortable by **priority** or **time of day**. Conflicts are flagged with a ⚠️ banner and marked per row (`detect_conflicts()`/`get_conflict_warnings()`); each row has a "✅ Complete" button (`TaskOccurrence.mark_complete()`).
+- **⏰ Missed Tasks** — lists any overdue, uncompleted occurrence (`Scheduler.get_missed_tasks()`). Weekly tasks get a "🔁 Auto-reschedule" button (`Scheduler.auto_reschedule_missed_weekly()`); anything can also be rescheduled manually to a new date/time (`Task.reschedule()`).
 
 ### Example workflow
 
-1. Enter an owner name (e.g. "Jordan") — the app creates and keeps one `Owner` in session state across reruns.
-2. Add a pet, "Mochi" (dog) — it shows up in the "Current pets" table.
-3. Add a task for Mochi: "Morning walk", WALK, 20 minutes, HIGH priority, 8:00 AM — it shows up in the "Current tasks" table.
-4. Add a second task at the same time, "Photo session", 8:00 AM, LOW priority, to see conflict detection in action.
-5. Click **Generate schedule**. The app calls `Scheduler.build_daily_plan_for_owner()`, then:
-   - Shows a ⚠️ error banner plus one `st.warning` per overlapping pair (from `get_conflict_warnings()`) if anything conflicts, or a ✅ success banner if the day is clash-free.
-   - Renders the plan as a table, ordered by priority or time of day depending on the toggle, with a `conflict` column marking the specific rows involved in an overlap.
-
-### Key Scheduler behaviors shown
-
-- **Priority ordering** — HIGH-priority tasks (e.g. "Morning walk") appear before MEDIUM/LOW ones in the default plan.
-- **Time-of-day sorting** — toggling to "Time of day" re-orders the same occurrences chronologically via `sort_by_time()`.
-- **Conflict warnings** — two tasks at 8:00 AM are flagged by `detect_conflicts()`/`get_conflict_warnings()` and marked in the table, while back-to-back tasks are correctly left unflagged.
-- **Daily recurrence** — a DAILY task (e.g. "Breakfast") marked complete advances to the next day's occurrence date without completing tomorrow's instance in advance.
+1. Enter your name in the sidebar — the app creates and keeps one `Owner` in session state across reruns.
+2. In **Pets**, add "Mochi" (dog).
+3. In **Tasks**, add "Morning walk" — WALK, 20 minutes, HIGH priority, 8:00 AM — then add a second task at the same time, "Photo session", LOW priority, to set up a conflict.
+4. In **Schedule**, click **Generate schedule**: a ⚠️ banner and marked row show the 8:00 AM conflict; HIGH-priority "Morning walk" sorts above "Photo session" in the default (priority) view. Click "✅ Complete" on a task to check it off — it drops out of the plan.
+5. In **Missed Tasks**, anything overdue and still incomplete shows up with a reschedule option.
 
 ### Sample CLI output
 
@@ -211,5 +185,15 @@ Marked 'Breakfast' complete for 2026-07-05 -- next occurrence: 2026-07-06
 
 Next available 30-minute slot for Mochi on/after 8:00 AM: 08:20 AM
 ```
+**Video Walkthrough**
+![PawPal+ app walkthrough](assets/pawpal-app-walkthrough.gif)
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+## 📁 Project Structure
+
+- `pawpal_system.py` — the backend logic layer: `Owner`, `Pet`, `Task`, `TaskOccurrence`, and `Scheduler`.
+- `app.py` — the Streamlit app.
+- `main.py` — a CLI demo script exercising the backend directly.
+- `tests/test_pawpal.py` — the automated test suite (`pytest`).
+- `diagrams/` — UML class diagrams (`uml.mmd` is the initial draft, `uml_final.mmd`/`Pawpal_UML_02.png` reflect the final implementation).
+- `reflection.md` — design decisions, tradeoffs, and AI-collaboration notes.
+- `ai_interactions.md` — a log of AI-assisted stretch work, including a two-model prompt comparison for the missed-weekly-task recovery algorithm.
