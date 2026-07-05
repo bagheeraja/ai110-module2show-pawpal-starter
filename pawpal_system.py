@@ -63,6 +63,7 @@ class Task:
     completed_dates: set[date] = field(default_factory=set)
 
     def __post_init__(self) -> None:
+        """Reject a 0 (or negative) duration -- see class docstring."""
         if self.duration_minutes <= 0:
             raise ValueError("duration_minutes must be greater than 0")
 
@@ -168,9 +169,11 @@ class TaskOccurrence:
 
     @property
     def completed(self) -> bool:
+        """Whether this specific occurrence has been completed."""
         return self.task.is_complete_on(self.occurrence_date)
 
     def mark_complete(self) -> None:
+        """Mark this specific occurrence complete on the underlying task."""
         self.task.mark_complete(self.occurrence_date)
 
 
@@ -184,6 +187,7 @@ class Pet:
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     def add_task(self, task: Task) -> None:
+        """Attach a new task template to this pet."""
         self.tasks.append(task)
 
     def remove_task(self, task_id: str) -> None:
@@ -225,6 +229,7 @@ class Owner:
     pets: list[Pet] = field(default_factory=list)
 
     def add_pet(self, pet: Pet) -> None:
+        """Register a new pet under this owner."""
         self.pets.append(pet)
 
     def get_pet(self, pet_id: str) -> Pet | None:
@@ -368,8 +373,7 @@ class Scheduler:
         """
         missed = []
         for task in pet.tasks:
-            current = task.scheduled_time.date()
-            while current < as_of:
+            for current in self._dates_to_check_for_missed(task, as_of):
                 if not task.is_complete_on(current):
                     window = task.window_on(current)
                     if window is not None:
@@ -383,5 +387,26 @@ class Scheduler:
                                 end_time=end_time,
                             )
                         )
-                current += timedelta(days=1)
         return missed
+
+    def _dates_to_check_for_missed(self, task: Task, as_of: date):
+        """Calendar dates strictly before ``as_of`` worth checking for a missed occurrence.
+
+        A one-off (NONE) task has exactly one possible occurrence date --
+        its anchor -- so it's checked directly rather than walking every
+        day from the anchor up to ``as_of``. That walk is unbounded in the
+        number of days since the task's anchor, so an old, never-completed
+        one-off task would otherwise scan hundreds of irrelevant days.
+        DAILY/WEEKLY tasks still need a day-by-day walk since any
+        individual day could be completed or missed independently.
+        """
+        anchor_date = task.scheduled_time.date()
+        if task.recurrence == Recurrence.NONE:
+            if anchor_date < as_of:
+                yield anchor_date
+            return
+
+        current = anchor_date
+        while current < as_of:
+            yield current
+            current += timedelta(days=1)
